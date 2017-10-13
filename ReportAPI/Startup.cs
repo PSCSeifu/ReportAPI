@@ -18,6 +18,9 @@ using Report.Data.FilterItems;
 using Report.Data.SortItems;
 using Report.Service;
 using ReportAPI.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ReportAPI
 {
@@ -43,48 +46,18 @@ namespace ReportAPI
 
         public IConfigurationRoot Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
+       
         public void ConfigureServices( IServiceCollection services)
-        {
-            // Add service and create Policy with options
-            services.AddCors(options =>
-            {
-                options.AddPolicy("OpenGate",
-                    builder => builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials());
-
-                options.AddPolicy("AngularPolicy",
-                   builder => builder.WithOrigins("http://localhost:4200")
-                   .AllowAnyMethod()
-                   .WithHeaders("accept","content-type", "origin","X-ANGREP")
-                   .AllowCredentials());
-            });
-
-            // Add framework services.
+        {           
+            AddCors(services);
+            AddAuthorization(services);
             services.AddMvc();
             services.Configure<ProjectAppSettings>(options => Configuration.GetSection("ProjectAppSettings").Bind(options));
-
             InjectServices(services);
-
-            // services.AddAntiforgery(options =>
-            //{
-            //    options.HeaderName = "X-XSRF-TOKEN";
-            //});
-            services.AddSwaggerGen(c => {
-                c.SwaggerDoc("v1", new Info
-                {
-                    Title = "ReportAPI",
-                    Version ="v1",
-                    Description = "Psc Report Templates Test Project API",
-                    TermsOfService = "Meh",
-                    Contact = new Contact { Name = "SomeGuy", Email ="meh@meh.com", Url = "http://meh.com"}
-                });
-            });
+            // services.AddAntiforgery(options => { options.HeaderName = "X-XSRF-TOKEN"; });
+            AddSwagger(services);
         }
-
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+               
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory, IAntiforgery antiforgery)
         {            
             app.UseCors("AngularPolicy");
@@ -119,6 +92,8 @@ namespace ReportAPI
             });
         }
 
+        #region " Configure Services "
+        
         private void InjectServices(IServiceCollection services)
         {
             services.AddScoped<IUserService, UserService>();
@@ -129,5 +104,60 @@ namespace ReportAPI
             services.AddScoped<ISortItemRepository, SortItemRepository>();
             services.AddScoped<IFilterItemRepository, FilterItemRepository>();
         }
+
+        private void AddCors(IServiceCollection services) =>
+            services.AddCors(options =>
+            {
+                options.AddPolicy("OpenGate",
+                    builder => builder.AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials());
+
+                options.AddPolicy("AngularPolicy",
+                   builder => builder.WithOrigins("http://localhost:4200")
+                   .AllowAnyMethod()
+                   .WithHeaders("accept", "content-type", "origin", "X-ANGREP")
+                   .AllowCredentials());
+            });        
+
+        private void AddSwagger(IServiceCollection services) =>
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new Info
+                {
+                    Title = "ReportAPI",
+                    Version = "v1",
+                    Description = "Psc Report Templates Test Project API",
+                    TermsOfService = "Meh",
+                    Contact = new Contact { Name = "SomeGuy", Email = "meh@meh.com", Url = "http://meh.com" }
+                });
+            });
+
+        private void AddAuthorization(IServiceCollection services) =>
+            services.AddAuthorization(auth =>
+            {
+                auth.AddPolicy("Bearer", new AuthorizationPolicyBuilder()
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+                    .RequireAuthenticatedUser().Build());
+            });
+
+        #endregion
+
+        #region " Configure "
+
+        private void UseJwtBearerAuthenticaiton(IApplicationBuilder app)
+        {
+            app.UseJwtBearerAuthentication(new JwtBearerOptions()
+            {
+                TokenValidationParameters = new TokenValidationParameters()
+                {
+                    //IssuerSigningKey =   TokenAuthOption.Key
+                }
+            });
+        }
+
+        #endregion
+
     }
 }
